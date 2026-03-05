@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Printer CV — Scroll to Print</title>
+<style>
+/* ============================================
+   RESET & BASE
+   ============================================ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  /* Smooth native scroll */
+  scroll-behavior: auto;
+}
+
+body {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  background: #1a1a2e;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* ============================================
+   SCROLL SPACER
+   Creates the tall scrollable area that drives
+   the printing animation via scroll progress.
+   Height is set dynamically by JS.
+   ============================================ */
+.scroll-spacer {
+  height: 500vh; /* fallback; JS overrides */
+  pointer-events: none;
+}
+
+/* ============================================
+   PROGRESS BAR
+   Thin bar at top of viewport showing scroll %
+   ============================================ */
+.progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 0%;
+  background: linear-gradient(90deg, #4ade80, #22d3ee);
+  z-index: 1000;
+  transition: width 0.05s linear;
+}
+
+/* ============================================
+   SCROLL HINT
+   Prompt at bottom of screen, fades on scroll
+   ============================================ */
+.scroll-hint {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.5);
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-size: 14px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transition: opacity 0.5s ease;
+  letter-spacing: 1px;
+}
+
+.scroll-hint .arrow {
+  width: 18px;
+  height: 18px;
+  border-right: 2px solid rgba(255, 255, 255, 0.5);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.5);
+  transform: rotate(45deg);
+  animation: bounce 1.5s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: rotate(45deg) translateY(0); }
+  50%      { transform: rotate(45deg) translateY(6px); }
+}
+
+/* ============================================
+   SCENE — Fixed overlay that holds the printer
+   ============================================ */
+.scene {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 6vh;
+  z-index: 10;
+  pointer-events: none;
+  overflow: hidden; /* clip paper at viewport bottom */
+}
+
+/* ============================================
+   PRINTER ASSEMBLY
+   ============================================ */
+.printer {
+  position: relative;
+  width: min(540px, 92vw);
+  flex-shrink: 0;
+}
+
+/* --- Printer Top Cover (paper input tray) --- */
+.printer-top {
+  width: 100%;
+  height: 45px;
+  background: linear-gradient(180deg, #eaeaee 0%, #dcdce0 100%);
+  border-radius: 14px 14px 0 0;
+  position: relative;
+  z-index: 30;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Decorative input tray groove */
+.input-tray {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 55%;
+  height: 5px;
+  background: #b5b5ba;
+  border-radius: 3px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* --- Printer Main Body --- */
+.printer-body {
+  width: 100%;
+  height: 130px;
+  background: linear-gradient(180deg, #d8d8dc 0%, #c8c8cc 40%, #bbbbbf 100%);
+  position: relative;
+  z-index: 30;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* Front control panel */
+.printer-panel {
+  position: absolute;
+  top: 14px;
+  left: 28px;
+  right: 28px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.printer-brand {
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  color: #666;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.printer-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Decorative buttons */
+.printer-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #b0b0b5, #a0a0a5);
+  border: 1px solid #999;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Status LED */
+.printer-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.6);
+  transition: all 0.3s ease;
+}
+
+.printer-led.printing {
+  background: #fbbf24;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.8);
+  animation: led-pulse 0.35s infinite;
+}
+
+@keyframes led-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+/* Decorative stripe on printer body */
+.printer-stripe {
+  position: absolute;
+  bottom: 35px;
+  left: 28px;
+  right: 28px;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+/* --- Paper Output Slot --- */
+.paper-slot {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 80px);
+  height: 10px;
+  background: #1e1e22;
+  border-radius: 0 0 3px 3px;
+  box-shadow:
+    inset 0 3px 8px rgba(0, 0, 0, 0.7),
+    0 1px 0 rgba(255, 255, 255, 0.06);
+  z-index: 35;
+}
+
+/* Slot inner detail — roller marks */
+.paper-slot::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 15%;
+  right: 15%;
+  height: 3px;
+  background: repeating-linear-gradient(
+    90deg,
+    #333 0px,
+    #333 4px,
+    #222 4px,
+    #222 8px
+  );
+  border-radius: 2px;
+}
+
+/* --- Printer Base / Feet --- */
+.printer-base {
+  width: 100%;
+  height: 18px;
+  background: linear-gradient(180deg, #ababaf, #9a9a9e);
+  border-radius: 0 0 10px 10px;
+  position: relative;
+  z-index: 22;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+}
+
+.printer-foot {
+  position: absolute;
+  bottom: -4px;
+  width: 36px;
+  height: 4px;
+  background: #666;
+  border-radius: 0 0 3px 3px;
+}
+.printer-foot.left  { left: 40px; }
+.printer-foot.right { right: 40px; }
+
+/* ============================================
+   PAPER TRACK
+   Clipping container that reveals the paper.
+   Height is driven by JS scroll progress.
+   ============================================ */
+.paper-track {
+  position: relative;
+  width: calc(100% - 80px);
+  margin: 0 auto;
+  height: 0;           /* grows via JS */
+  overflow: hidden;
+  z-index: 15;
+  margin-top: -18px;   /* tuck under printer base & slot */
+  /* Anchor paper to the bottom of the track so the paper's
+     bottom (header) is revealed first — like a real printer */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* Top shadow — simulates paper emerging from inside */
+.paper-track::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 14px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.15), transparent);
+  z-index: 50;
+  pointer-events: none;
+}
+
+/* ============================================
+   PAPER
+   The sheet itself, containing CV content.
+   ============================================ */
+.paper {
+  width: 100%;
+  background: #fefefe;
+  padding: 50px 50px 70px;
+  position: relative;
+  box-shadow:
+    3px 0 12px rgba(0, 0, 0, 0.06),
+    -3px 0 12px rgba(0, 0, 0, 0.06),
+    0 6px 24px rgba(0, 0, 0, 0.1);
+  /* Reverse visual order: header at bottom, interests at top
+     — matches face-up printer output order */
+  display: flex;
+  flex-direction: column-reverse;
+  flex-shrink: 0;
+}
+
+/* Subtle ruled-line texture */
+.paper::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 27px,
+    rgba(0, 0, 0, 0.018) 27px,
+    rgba(0, 0, 0, 0.018) 28px
+  );
+  pointer-events: none;
+}
+
+/* Left margin line (like ruled paper) */
+.paper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 38px;
+  width: 1px;
+  background: rgba(220, 80, 80, 0.08);
+  pointer-events: none;
+}
+
+/* ============================================
+   PRINT HEAD
+   Animated line at the printing edge
+   ============================================ */
+.print-head {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 100, 240, 0.3) 30%,
+    rgba(0, 100, 240, 0.7) 50%,
+    rgba(0, 100, 240, 0.3) 70%,
+    transparent 100%
+  );
+  background-size: 50% 100%;
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.print-head.active {
+  opacity: 1;
+  animation: sweep 0.5s infinite linear;
+}
+
+@keyframes sweep {
+  from { background-position: -100% 0; }
+  to   { background-position: 200% 0; }
+}
+
+/* ============================================
+   CV CONTENT SECTIONS
+   Each section fades + slides in when "printed"
+   ============================================ */
+.cv-section {
+  margin-bottom: 24px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.cv-section.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* --- Header --- */
+.cv-header {
+  text-align: center;
+  padding-top: 18px;
+  border-top: 2.5px solid #1a1a2e;
+  margin-bottom: 22px;
+}
+
+.cv-header h1 {
+  font-size: 26px;
+  color: #1a1a2e;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.cv-header .subtitle {
+  font-size: 14px;
+  color: #555;
+  font-style: italic;
+  letter-spacing: 1px;
+}
+
+.cv-header .contact-row {
+  margin-top: 12px;
+  font-size: 11px;
+  color: #777;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  line-height: 1.7;
+}
+
+.cv-header .contact-row span {
+  margin: 0 6px;
+}
+
+.cv-header .contact-row .sep {
+  color: #bbb;
+}
+
+/* --- Section Titles --- */
+.section-title {
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1a1a2e;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 14px;
+}
+
+/* --- Summary --- */
+.summary-text {
+  font-size: 13px;
+  color: #444;
+  line-height: 1.75;
+}
+
+/* --- Skills --- */
+.skills-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.skill-tag {
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-size: 11px;
+  padding: 4px 14px;
+  background: #f0f0f5;
+  border: 1px solid #e0e0e5;
+  border-radius: 14px;
+  color: #444;
+  letter-spacing: 0.5px;
+}
+
+/* --- Experience Items --- */
+.exp-item {
+  margin-bottom: 18px;
+}
+
+.exp-item:last-child {
+  margin-bottom: 0;
+}
+
+.exp-item h3 {
+  font-size: 14px;
+  color: #1a1a2e;
+  margin-bottom: 2px;
+}
+
+.exp-item .company {
+  font-size: 13px;
+  color: #666;
+  font-style: italic;
+}
+
+.exp-item .date {
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 6px;
+}
+
+.exp-item ul {
+  padding-left: 20px;
+  font-size: 12px;
+  color: #555;
+  line-height: 1.85;
+}
+
+/* --- Education --- */
+.edu-item {
+  margin-bottom: 12px;
+}
+
+.edu-item:last-child {
+  margin-bottom: 0;
+}
+
+.edu-item h3 {
+  font-size: 14px;
+  color: #1a1a2e;
+  margin-bottom: 2px;
+}
+
+.edu-item .school {
+  font-size: 13px;
+  color: #666;
+  font-style: italic;
+}
+
+.edu-item .date {
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  font-size: 11px;
+  color: #999;
+}
+
+/* --- Interests / Footer --- */
+.interests-text {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.7;
+}
+
+/* ============================================
+   COMPLETION STATE
+   Subtle glow when fully printed
+   ============================================ */
+.paper.complete {
+  box-shadow:
+    3px 0 12px rgba(0, 0, 0, 0.06),
+    -3px 0 12px rgba(0, 0, 0, 0.06),
+    0 6px 30px rgba(74, 222, 128, 0.12);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 600px) {
+  .scene {
+    padding-top: 3vh;
+  }
+
+  .printer {
+    width: 96vw;
+  }
+
+  .paper {
+    padding: 30px 24px 50px;
+  }
+
+  .cv-header h1 {
+    font-size: 20px;
+    letter-spacing: 2px;
+  }
+
+  .cv-header .subtitle {
+    font-size: 12px;
+  }
+
+  .cv-header .contact-row {
+    font-size: 10px;
+  }
+
+  .section-title {
+    font-size: 11px;
+  }
+
+  .summary-text {
+    font-size: 12px;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ========== PROGRESS BAR ========== -->
+<div class="progress-bar" id="progressBar"></div>
+
+<!-- ========== SCROLL HINT ========== -->
+<div class="scroll-hint" id="scrollHint">
+  <span>Scroll to print</span>
+  <div class="arrow"></div>
+</div>
+
+<!-- ========== SCROLL SPACER (drives animation) ========== -->
+<div class="scroll-spacer" id="scrollSpacer"></div>
+
+<!-- ========== FIXED PRINTER SCENE ========== -->
+<div class="scene">
+  <div class="printer">
+
+    <!-- Printer Top Cover -->
+    <div class="printer-top">
+      <div class="input-tray"></div>
+    </div>
+
+    <!-- Printer Main Body -->
+    <div class="printer-body">
+      <div class="printer-panel">
+        <span class="printer-brand">PrinterCV</span>
+        <div class="printer-controls">
+          <div class="printer-btn"></div>
+          <div class="printer-btn"></div>
+          <div class="printer-led" id="printerLed"></div>
+        </div>
+      </div>
+      <div class="printer-stripe"></div>
+      <div class="paper-slot"></div>
+    </div>
+
+    <!-- Printer Base -->
+    <div class="printer-base">
+      <div class="printer-foot left"></div>
+      <div class="printer-foot right"></div>
+    </div>
+
+    <!-- Paper Track (clipping container, height driven by JS) -->
+    <div class="paper-track" id="paperTrack">
+      <div class="paper" id="paper">
+
+        <!-- Print head indicator -->
+        <div class="print-head" id="printHead"></div>
+
+        <!-- ===== CV CONTENT ===== -->
+
+        <!-- 1. Header -->
+        <div class="cv-section cv-header" data-section="0">
+          <h1>Jane Doe</h1>
+          <p class="subtitle">Full-Stack Developer &amp; UI Designer</p>
+          <div class="contact-row">
+            <span>jane.doe@email.com</span><span class="sep">|</span>
+            <span>+1 (555) 123-4567</span><span class="sep">|</span>
+            <span>github.com/janedoe</span><span class="sep">|</span>
+            <span>San Francisco, CA</span>
+          </div>
+        </div>
+
+        <!-- 2. Summary -->
+        <div class="cv-section" data-section="1">
+          <div class="section-title">Professional Summary</div>
+          <p class="summary-text">
+            Creative and detail-oriented full-stack developer with 6+ years of
+            experience building responsive web applications and scalable APIs.
+            Passionate about clean code, modern frameworks, and crafting
+            intuitive user experiences. Proven track record of delivering
+            high-quality products in fast-paced startup environments.
+          </p>
+        </div>
+
+        <!-- 3. Skills -->
+        <div class="cv-section" data-section="2">
+          <div class="section-title">Technical Skills</div>
+          <div class="skills-grid">
+            <span class="skill-tag">JavaScript</span>
+            <span class="skill-tag">TypeScript</span>
+            <span class="skill-tag">React</span>
+            <span class="skill-tag">Vue.js</span>
+            <span class="skill-tag">Node.js</span>
+            <span class="skill-tag">Python</span>
+            <span class="skill-tag">PostgreSQL</span>
+            <span class="skill-tag">MongoDB</span>
+            <span class="skill-tag">Docker</span>
+            <span class="skill-tag">AWS</span>
+            <span class="skill-tag">GraphQL</span>
+            <span class="skill-tag">Figma</span>
+            <span class="skill-tag">Git</span>
+            <span class="skill-tag">CI/CD</span>
+          </div>
+        </div>
+
+        <!-- 4. Experience -->
+        <div class="cv-section" data-section="3">
+          <div class="section-title">Experience</div>
+
+          <div class="exp-item">
+            <h3>Senior Frontend Developer</h3>
+            <div class="company">TechCorp Inc.</div>
+            <div class="date">Jan 2023 &mdash; Present</div>
+            <ul>
+              <li>Led redesign of the main SaaS platform, improving user engagement by 40%</li>
+              <li>Architected a shared component library adopted by 5 product teams</li>
+              <li>Mentored 3 junior developers and established code review standards</li>
+            </ul>
+          </div>
+
+          <div class="exp-item">
+            <h3>Full-Stack Developer</h3>
+            <div class="company">StartupXYZ</div>
+            <div class="date">Mar 2020 &mdash; Dec 2022</div>
+            <ul>
+              <li>Built and maintained RESTful APIs serving 100K+ daily active users</li>
+              <li>Implemented real-time collaboration features using WebSockets</li>
+              <li>Reduced page load time by 60% through code-splitting and caching</li>
+            </ul>
+          </div>
+
+          <div class="exp-item">
+            <h3>Junior Web Developer</h3>
+            <div class="company">DigitalAgency Co.</div>
+            <div class="date">Jun 2018 &mdash; Feb 2020</div>
+            <ul>
+              <li>Developed responsive websites for 20+ clients across various industries</li>
+              <li>Integrated third-party APIs including Stripe, Twilio, and Google Maps</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 5. Education -->
+        <div class="cv-section" data-section="4">
+          <div class="section-title">Education</div>
+          <div class="edu-item">
+            <h3>B.Sc. Computer Science</h3>
+            <div class="school">University of California, Berkeley</div>
+            <div class="date">2014 &mdash; 2018</div>
+          </div>
+        </div>
+
+        <!-- 6. Projects -->
+        <div class="cv-section" data-section="5">
+          <div class="section-title">Projects</div>
+          <div class="exp-item">
+            <h3>OpenSource Dashboard</h3>
+            <div class="date">github.com/janedoe/os-dashboard</div>
+            <ul>
+              <li>Real-time analytics dashboard built with React and D3.js</li>
+              <li>1.2K+ GitHub stars, actively used by 50+ companies</li>
+            </ul>
+          </div>
+          <div class="exp-item">
+            <h3>DevChat</h3>
+            <div class="date">github.com/janedoe/devchat</div>
+            <ul>
+              <li>End-to-end encrypted team chat app with file sharing</li>
+              <li>Built with Node.js, Socket.io, and React Native</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 7. Interests -->
+        <div class="cv-section" data-section="6">
+          <div class="section-title">Interests</div>
+          <p class="interests-text">
+            Open-source contribution &bull; Technical blogging &bull;
+            UI/UX design &bull; Rock climbing &bull; Coffee brewing
+          </p>
+        </div>
+
+      </div><!-- .paper -->
+    </div><!-- .paper-track -->
+
+  </div><!-- .printer -->
+</div><!-- .scene -->
+
+
+<script>
+/* ============================================
+   SCROLL-CONTROLLED PRINTER ANIMATION
+   
+   Maps window.scrollY → paper reveal height.
+   Content sections fade in as they enter the
+   visible (printed) area. Scrolling back up
+   retracts the paper and hides content.
+   ============================================ */
+(() => {
+  'use strict';
+
+  // --- DOM References ---
+  const paperTrack  = document.getElementById('paperTrack');
+  const paper       = document.getElementById('paper');
+  const printHead   = document.getElementById('printHead');
+  const printerLed  = document.getElementById('printerLed');
+  const scrollHint  = document.getElementById('scrollHint');
+  const progressBar = document.getElementById('progressBar');
+  const scrollSpacer = document.getElementById('scrollSpacer');
+  const sections    = document.querySelectorAll('.cv-section');
+
+  // --- Configuration ---
+  const SCROLL_MULTIPLIER = 3.5;  // scroll-pixels per paper-pixel (higher = slower print)
+  const REVEAL_BUFFER     = 30;   // px into visible area before a section fades in
+  const SCROLL_IDLE_MS    = 150;  // ms after last scroll to consider "idle"
+
+  // --- State ---
+  let ticking       = false;
+  let scrollTimeout = null;
+  let lastProgress  = 0;
+  let paperHeight   = 0;
+
+  /**
+   * Measure the paper's natural content height and
+   * set the scroll spacer so 100% scroll = fully printed.
+   */
+  function calibrate() {
+    // Temporarily expand track so paper can be measured
+    paperTrack.style.height = 'auto';
+    paperHeight = paper.scrollHeight;
+    paperTrack.style.height = '0px';
+
+    // Spacer = viewport + (paper height × multiplier)
+    // This ensures progress 0→1 maps to 0→paperHeight
+    const spacerHeight = window.innerHeight + paperHeight * SCROLL_MULTIPLIER;
+    scrollSpacer.style.height = spacerHeight + 'px';
+  }
+
+  /**
+   * Calculate normalised scroll progress (0 → 1).
+   */
+  function getProgress() {
+    const maxScroll = document.body.scrollHeight - window.innerHeight;
+    if (maxScroll <= 0) return 0;
+    return Math.min(Math.max(window.scrollY / maxScroll, 0), 1);
+  }
+
+  /**
+   * Core update — called on each animation frame during scroll.
+   */
+  function update() {
+    const progress = getProgress();
+
+    // 1. Paper reveal: expand the clipping track
+    const revealed = progress * paperHeight;
+    paperTrack.style.height = revealed + 'px';
+
+    // 2. Progress bar width
+    progressBar.style.width = (progress * 100) + '%';
+
+    // 3. Reveal / hide content sections (bottom-up: header first, interests last)
+    sections.forEach((section) => {
+      // With reversed layout + bottom-anchored paper, sections near the
+      // paper bottom are revealed first. A section is visible when its
+      // bottom edge enters the revealed area (past the buffer).
+      const sectionBottom = section.offsetTop + section.offsetHeight;
+      const clipTop = paperHeight - revealed;
+      if (sectionBottom > clipTop + REVEAL_BUFFER) {
+        section.classList.add('visible');
+      } else {
+        section.classList.remove('visible');
+      }
+    });
+
+    // 4. Print head at top edge of revealed area (near the printer slot)
+    const isScrolling = Math.abs(progress - lastProgress) > 0.00005;
+    if (isScrolling && progress > 0.005 && progress < 0.995) {
+      printHead.style.top = Math.max(paperHeight - revealed, 0) + 'px';
+      printHead.classList.add('active');
+    }
+
+    // 5. LED state (printing vs idle)
+    if (isScrolling && progress > 0) {
+      printerLed.classList.add('printing');
+    }
+
+    // 6. Scroll hint visibility
+    scrollHint.style.opacity = progress > 0.03 ? '0' : '1';
+
+    // 7. Completion glow
+    if (progress > 0.98) {
+      paper.classList.add('complete');
+    } else {
+      paper.classList.remove('complete');
+    }
+
+    lastProgress = progress;
+    ticking = false;
+  }
+
+  /**
+   * Scroll handler — throttled via requestAnimationFrame
+   */
+  function onScroll() {
+    if (!ticking) {
+      requestAnimationFrame(update);
+      ticking = true;
+    }
+
+    // Detect scroll-stop to turn off printing indicators
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      printerLed.classList.remove('printing');
+      printHead.classList.remove('active');
+    }, SCROLL_IDLE_MS);
+  }
+
+  /**
+   * Resize handler — recalibrate measurements
+   */
+  function onResize() {
+    calibrate();
+    update();
+  }
+
+  // --- Initialise ---
+  calibrate();
+  update();
+
+  // --- Event Listeners ---
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onResize, { passive: true });
+})();
+</script>
+
+</body>
+</html>
