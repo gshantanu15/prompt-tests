@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>prompt-tests by shan</title>
+  <meta name="description" content="A portfolio of prompt-driven development experiments. Each project captures a complete lifecycle from specification through implementation to documented results.">
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --max-w: 960px;
+      --radius: 20px;
+      --radius-sm: 12px;
+      --blur: 24px;
+      --blur-heavy: 40px;
+      --transition: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ── Dark Theme (default) ─────────────────────────────── */
+    [data-theme="dark"] {
+      --bg:              #06060a;
+      --bg-mesh-1:       #2d0a5e;
+      --bg-mesh-2:       #0a2848;
+      --bg-mesh-3:       #0e3a22;
+      --bg-mesh-4:       #380e50;
+      --surface:         rgba(255, 255, 255, 0.07);
+      --surface-hover:   rgba(255, 255, 255, 0.11);
+      --surface-strong:  rgba(255, 255, 255, 0.14);
+      --border:          rgba(255, 255, 255, 0.13);
+      --border-light:    rgba(255, 255, 255, 0.08);
+      --border-shimmer:  rgba(255, 255, 255, 0.25);
+      --text:            #f5f5f7;
+      --text-secondary:  rgba(245, 245, 247, 0.75);
+      --text-dim:        rgba(245, 245, 247, 0.45);
+      --accent:          #64b5ff;
+      --accent-glow:     rgba(100, 181, 255, 0.22);
+      --accent-2:        #4ade80;
+      --accent-3:        #c084fc;
+      --specular-top:    rgba(255, 255, 255, 0.16);
+      --specular-bottom: rgba(255, 255, 255, 0.03);
+      --refraction:      rgba(180, 200, 255, 0.07);
+      --shadow:          0 8px 32px rgba(0, 0, 0, 0.50), 0 2px 8px rgba(0, 0, 0, 0.40);
+      --shadow-lg:       0 20px 60px rgba(0, 0, 0, 0.60), 0 4px 16px rgba(0, 0, 0, 0.45);
+      --inset-glow:      inset 0 1px 0 rgba(255,255,255,0.10), inset 0 0 0 0.5px rgba(255,255,255,0.05);
+      --glass-tint:      rgba(140, 160, 200, 0.05);
+    }
+
+    /* ── Light Theme ──────────────────────────────────────── */
+    [data-theme="light"] {
+      --bg:              #eeedf4;
+      --bg-mesh-1:       #d4a8f0;
+      --bg-mesh-2:       #a8d0f0;
+      --bg-mesh-3:       #a8f0c4;
+      --bg-mesh-4:       #f0bca0;
+      --surface:         rgba(255, 255, 255, 0.62);
+      --surface-hover:   rgba(255, 255, 255, 0.78);
+      --surface-strong:  rgba(255, 255, 255, 0.88);
+      --border:          rgba(255, 255, 255, 0.72);
+      --border-light:    rgba(255, 255, 255, 0.50);
+      --border-shimmer:  rgba(255, 255, 255, 0.95);
+      --text:            #1a1a1c;
+      --text-secondary:  rgba(26, 26, 28, 0.65);
+      --text-dim:        rgba(26, 26, 28, 0.40);
+      --accent:          #0066d6;
+      --accent-glow:     rgba(0, 102, 214, 0.14);
+      --accent-2:        #22963e;
+      --accent-3:        #7c3aad;
+      --specular-top:    rgba(255, 255, 255, 0.92);
+      --specular-bottom: rgba(255, 255, 255, 0.22);
+      --refraction:      rgba(190, 160, 255, 0.10);
+      --shadow:          0 4px 24px rgba(0, 0, 0, 0.07), 0 1px 6px rgba(0, 0, 0, 0.05);
+      --shadow-lg:       0 12px 40px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.07);
+      --inset-glow:      inset 0 1px 0 rgba(255,255,255,0.85), inset 0 0 0 0.5px rgba(255,255,255,0.45);
+      --glass-tint:      rgba(255, 255, 255, 0.28);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+      transition: background var(--transition), color var(--transition);
+    }
+
+    a { color: var(--accent); text-decoration: none; transition: color 0.2s; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Animated Mesh Gradient Background ─────────────────── */
+    .bg-mesh {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      overflow: hidden;
+    }
+
+    .bg-mesh::before,
+    .bg-mesh::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(110px);
+      opacity: 0.85;
+      animation: meshFloat 20s ease-in-out infinite;
+      transition: background 1.5s ease;
+    }
+
+    .bg-mesh::before {
+      width: 55vw; height: 55vw;
+      top: -15%; left: -8%;
+      background: radial-gradient(circle, var(--bg-mesh-1), transparent 65%);
+    }
+
+    .bg-mesh::after {
+      width: 50vw; height: 50vw;
+      bottom: -10%; right: -8%;
+      background: radial-gradient(circle, var(--bg-mesh-2), transparent 65%);
+      animation-delay: -7s;
+      animation-duration: 25s;
+    }
+
+    .bg-mesh-extra {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(110px);
+      opacity: 0.65;
+      z-index: -1;
+      transition: background 1.5s ease;
+    }
+
+    .bg-mesh-extra:nth-child(2) {
+      width: 45vw; height: 45vw;
+      top: 30%; right: 15%;
+      background: radial-gradient(circle, var(--bg-mesh-3), transparent 65%);
+      animation: meshFloat 22s ease-in-out infinite;
+      animation-delay: -3s;
+    }
+
+    .bg-mesh-extra:nth-child(3) {
+      width: 40vw; height: 40vw;
+      top: 55%; left: 5%;
+      background: radial-gradient(circle, var(--bg-mesh-4), transparent 65%);
+      animation: meshFloat 18s ease-in-out infinite;
+      animation-delay: -10s;
+    }
+
+    @keyframes meshFloat {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33%      { transform: translate(30px, -25px) scale(1.05); }
+      66%      { transform: translate(-20px, 20px) scale(0.95); }
+    }
+
+    /* ── Glass Panel Mixin ────────────────────────────────── */
+    .glass {
+      background: var(--surface);
+      backdrop-filter: blur(var(--blur)) saturate(180%) brightness(1.05);
+      -webkit-backdrop-filter: blur(var(--blur)) saturate(180%) brightness(1.05);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow), var(--inset-glow);
+      position: relative;
+      transition: background var(--transition), border-color var(--transition), box-shadow var(--transition), transform 0.3s ease;
+    }
+
+    /* Specular highlight — top edge light refraction + subtle prismatic edge */
+    .glass::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background:
+        linear-gradient(
+          170deg,
+          var(--specular-top) 0%,
+          var(--refraction) 15%,
+          transparent 45%,
+          transparent 80%,
+          var(--specular-bottom) 100%
+        );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .glass:hover {
+      background: var(--surface-hover);
+      border-color: var(--border-shimmer);
+      box-shadow: var(--shadow-lg), var(--inset-glow);
+      transform: translateY(-2px);
+    }
+
+    /* ── Prismatic Hover Glow (on project cards) ─────────── */
+    .glass-shimmer {
+      position: relative;
+    }
+
+    /* Soft prismatic glow on hover — no rotating element */
+    .glass-shimmer::after {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      background: linear-gradient(
+        135deg,
+        rgba(108,180,255,0.15) 0%,
+        rgba(160,120,255,0.12) 25%,
+        rgba(255,160,200,0.08) 50%,
+        rgba(100,220,160,0.10) 75%,
+        rgba(108,180,255,0.15) 100%
+      );
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    .glass-shimmer:hover::after {
+      opacity: 1;
+    }
+
+    [data-theme="light"] .glass-shimmer::after {
+      background: linear-gradient(
+        135deg,
+        rgba(0,102,214,0.10) 0%,
+        rgba(124,58,173,0.08) 25%,
+        rgba(220,80,160,0.06) 50%,
+        rgba(34,150,62,0.07) 75%,
+        rgba(0,102,214,0.10) 100%
+      );
+    }
+
+    /* ── Theme Toggle ─────────────────────────────────────── */
+    .theme-toggle {
+      position: fixed;
+      top: 1.25rem;
+      right: 1.25rem;
+      z-index: 100;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow), var(--inset-glow);
+      transition: background var(--transition), border-color var(--transition), transform 0.2s;
+    }
+
+    .theme-toggle:hover {
+      background: var(--surface-hover);
+      transform: scale(1.08);
+    }
+
+    .theme-toggle:active {
+      transform: scale(0.95);
+    }
+
+    .theme-toggle svg {
+      width: 20px;
+      height: 20px;
+      fill: var(--text-secondary);
+      transition: fill var(--transition);
+    }
+
+    .theme-toggle .icon-sun  { display: none; }
+    .theme-toggle .icon-moon { display: block; }
+    [data-theme="light"] .theme-toggle .icon-sun  { display: block; }
+    [data-theme="light"] .theme-toggle .icon-moon { display: none; }
+
+    /* ── Header ───────────────────────────────────────────── */
+    .site-header {
+      padding: 4rem 1.5rem 3rem;
+      text-align: center;
+      position: relative;
+    }
+
+    .site-header h1 {
+      font-size: 3rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.75rem;
+      background: linear-gradient(135deg, var(--text) 0%, var(--accent) 50%, var(--accent-3) 100%);
+      background-size: 200% 200%;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      animation: titleShift 6s ease-in-out infinite;
+    }
+
+    @keyframes titleShift {
+      0%, 100% { background-position: 0% 50%; }
+      50%      { background-position: 100% 50%; }
+    }
+
+    .site-header .tagline {
+      color: var(--text-secondary);
+      max-width: 600px;
+      margin: 0 auto;
+      font-size: 1.12rem;
+      font-weight: 400;
+      line-height: 1.7;
+    }
+
+    .header-links {
+      display: flex;
+      gap: 0.75rem;
+      justify-content: center;
+      margin-top: 1.5rem;
+    }
+
+    .header-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.85rem;
+      padding: 8px 18px;
+      border-radius: 50px;
+      color: var(--text-secondary);
+      transition: color 0.2s, background 0.2s;
+    }
+
+    .header-pill svg {
+      width: 15px;
+      height: 15px;
+      fill: currentColor;
+    }
+
+    .header-pill:hover {
+      color: var(--text);
+      background: var(--surface);
+      text-decoration: none;
+    }
+
+    /* ── Main ─────────────────────────────────────────────── */
+    main {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 1rem 1.5rem 4rem;
+    }
+
+    .section-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-dim);
+      margin-bottom: 1.25rem;
+      padding-left: 2px;
+    }
+
+    /* ── Project Card ─────────────────────────────────────── */
+    .project-card {
+      margin-bottom: 2.5rem;
+      overflow: visible;
+    }
+
+    .project-card > * { position: relative; z-index: 2; }
+
+    .card-demo {
+      position: relative;
+      border-radius: var(--radius) var(--radius) 0 0;
+      overflow: hidden;
+      background: rgba(0,0,0,0.15);
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .card-demo img {
+      width: 100%;
+      display: block;
+      object-fit: contain;
+      max-height: 420px;
+      opacity: 0.95;
+    }
+
+    .card-demo .demo-badge {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: var(--surface-strong);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      color: var(--text-secondary);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: 50px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .card-body {
+      padding: 2rem;
+      border-radius: 0 0 var(--radius) var(--radius);
+    }
+
+    .card-body h2 {
+      font-size: 1.65rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.2rem;
+    }
+
+    .card-body .subtitle {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+      margin-bottom: 1.15rem;
+      font-weight: 500;
+    }
+
+    .card-body .description {
+      color: var(--text-secondary);
+      margin-bottom: 1.25rem;
+      font-size: 0.95rem;
+      line-height: 1.7;
+    }
+
+    /* Tags — pill shaped */
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .tag {
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 50px;
+      background: var(--surface);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-light);
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .tag--html     { color: #ff8c42; border-color: rgba(255,140,66,0.20); background: rgba(255,140,66,0.06); }
+    .tag--css      { color: #5da3ff; border-color: rgba(93,163,255,0.20); background: rgba(93,163,255,0.06); }
+    .tag--js       { color: #f0d860; border-color: rgba(240,216,96,0.20); background: rgba(240,216,96,0.06); }
+    .tag--prompt   { color: var(--accent-3); border-color: rgba(212,160,255,0.20); background: rgba(212,160,255,0.06); }
+    .tag--copilot  { color: var(--accent-2); border-color: rgba(93,230,126,0.20); background: rgba(93,230,126,0.06); }
+
+    [data-theme="light"] .tag--html     { color: #d56a20; }
+    [data-theme="light"] .tag--css      { color: #2b7dd6; }
+    [data-theme="light"] .tag--js       { color: #a89520; }
+    [data-theme="light"] .tag--prompt   { color: #7b3fa0; }
+    [data-theme="light"] .tag--copilot  { color: #1e8a38; }
+
+    /* Highlights */
+    .highlights {
+      list-style: none;
+      margin-bottom: 1.25rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.35rem 1.5rem;
+    }
+
+    .highlights li {
+      position: relative;
+      padding-left: 1rem;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+
+    .highlights li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0.55em;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.7;
+    }
+
+    /* Link row */
+    .card-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border-light);
+    }
+
+    .card-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.82rem;
+      font-weight: 500;
+      padding: 8px 16px;
+      border-radius: 50px;
+      border: 1px solid var(--border);
+      background: var(--glass-tint);
+      backdrop-filter: blur(16px) saturate(160%);
+      -webkit-backdrop-filter: blur(16px) saturate(160%);
+      color: var(--text-secondary);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .card-link:hover {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+      text-decoration: none;
+      color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px var(--accent-glow);
+    }
+
+    .card-link svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+      flex-shrink: 0;
+    }
+
+    /* ── How It Works ─────────────────────────────────────── */
+    .how-section {
+      margin-top: 3rem;
+    }
+
+    .how-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.75rem;
+    }
+
+    .how-card {
+      padding: 1.5rem 1.25rem;
+      text-align: center;
+    }
+
+    .how-card .step-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      margin-bottom: 0.75rem;
+      font-size: 1.1rem;
+      background: var(--surface-strong);
+      backdrop-filter: blur(8px) saturate(180%);
+      -webkit-backdrop-filter: blur(8px) saturate(180%);
+      border: 1px solid var(--border-light);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .how-card h3 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+
+    .how-card p {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    /* ── Placeholder Card ─────────────────────────────────── */
+    .placeholder-card {
+      border-style: dashed !important;
+      border-color: var(--border-light) !important;
+      text-align: center;
+      padding: 3rem 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .placeholder-card:hover {
+      border-color: var(--border) !important;
+    }
+
+    .placeholder-icon {
+      font-size: 2rem;
+      opacity: 0.3;
+      margin-bottom: 0.5rem;
+    }
+
+    .placeholder-card .subtitle {
+      color: var(--text-dim);
+      font-size: 0.88rem;
+    }
+
+    /* ── Footer ───────────────────────────────────────────── */
+    .site-footer {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: var(--text-dim);
+      font-size: 0.8rem;
+      position: relative;
+    }
+
+    .site-footer::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(400px, 80%);
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+    }
+
+    /* ── Responsive ───────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .site-header { padding: 3rem 1.25rem 2rem; }
+      .site-header h1 { font-size: 2rem; }
+      .site-header .tagline { font-size: 1rem; }
+      main { padding: 1rem 1rem 3rem; }
+      .card-body { padding: 1.25rem; }
+      .card-body h2 { font-size: 1.3rem; }
+      .highlights { grid-template-columns: 1fr; }
+      .how-grid { grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+    }
+
+    @media (max-width: 480px) {
+      .site-header h1 { font-size: 1.6rem; }
+      .how-grid { grid-template-columns: 1fr; }
+      .card-links { flex-direction: column; }
+      .card-link { justify-content: center; }
+      .theme-toggle { top: 0.75rem; right: 0.75rem; width: 38px; height: 38px; }
+    }
+
+    /* ── Entry Animations ─────────────────────────────────── */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+
+    .fade-up.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── Reduced Motion ────────────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+      .fade-up { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ─── Animated Mesh Background ────────────────────── -->
+  <div class="bg-mesh" aria-hidden="true">
+    <div class="bg-mesh-extra"></div>
+    <div class="bg-mesh-extra"></div>
+  </div>
+
+  <!-- ─── Theme Toggle ────────────────────────────────── -->
+  <button class="theme-toggle" aria-label="Toggle light and dark theme" type="button">
+    <svg class="icon-moon" viewBox="0 0 24 24"><path d="M12 3a9 9 0 109 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 01-4.4 2.26 5.403 5.403 0 01-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+    <svg class="icon-sun" viewBox="0 0 24 24"><path d="M12 7a5 5 0 100 10 5 5 0 000-10zm0-5a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm0 18a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zm9-9a1 1 0 110 2h-1a1 1 0 110-2h1zM4 11a1 1 0 110 2H3a1 1 0 110-2h1zm14.36-5.95a1 1 0 010 1.41l-.7.71a1 1 0 11-1.42-1.42l.71-.7a1 1 0 011.41 0zM7.76 16.24a1 1 0 010 1.41l-.71.71a1 1 0 11-1.41-1.42l.7-.7a1 1 0 011.42 0zm10.48 0a1 1 0 011.42 1.41l-.71.71a1 1 0 01-1.41-1.42l.7-.7zM7.05 5.34a1 1 0 011.41 1.42l-.7.7a1 1 0 11-1.42-1.41l.71-.71z"/></svg>
+  </button>
+
+  <!-- ─── Header ──────────────────────────────────────── -->
+  <header class="site-header">
+    <h1>💬&gt;_ Prompt Tests</h1>
+    <p class="tagline">A collection of prompt-driven development experiments. Each project captures a complete lifecycle — from natural-language specification through implementation to documented results.</p>
+    <div class="header-links">
+      <a class="header-pill glass" href="https://github.com/gshantanu15/prompt-tests" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        Source on GitHub
+      </a>
+    </div>
+  </header>
+
+  <!-- ─── Main ────────────────────────────────────────── -->
+  <main>
+
+    <p class="section-label">Projects</p>
+
+    <!-- ── CV Printer ─────────────────────────────────── -->
+    <article class="project-card glass glass-shimmer fade-up" id="cv-printer">
+      <div class="card-demo">
+        <img src="cv-printer/demo/test_v.1.0.gif" alt="CV Printer demo — a scroll-driven printer animation that feeds out a CV" loading="lazy">
+        <span class="demo-badge">v1.0 demo</span>
+      </div>
+      <div class="card-body">
+        <h2>Printer CV</h2>
+        <p class="subtitle">Scroll-to-Print Animated CV &middot; Single HTML File</p>
+
+        <p class="description">
+          A single-page animated printer simulation built entirely with HTML, CSS, and vanilla JavaScript.
+          Scrolling feeds a sheet of paper out of a printer, revealing a CV line-by-line — just like watching a real printer at work.
+          Created as a prompt-driven development test using GitHub Copilot.
+        </p>
+
+        <div class="tags">
+          <span class="tag tag--html">HTML</span>
+          <span class="tag tag--css">CSS</span>
+          <span class="tag tag--js">JavaScript</span>
+          <span class="tag tag--prompt">Prompt Engineering</span>
+          <span class="tag tag--copilot">GitHub Copilot</span>
+        </div>
+
+        <ul class="highlights">
+          <li>Paper feeds bottom-up matching real printer physics</li>
+          <li>Print head with animated blue sweep at printing edge</li>
+          <li>Status LED pulses amber during active printing</li>
+          <li>Initial prompt produced ~550 lines in one shot</li>
+          <li>Physics correction required only 3 CSS + 2 JS edits</li>
+          <li>Zero dependencies — pure HTML, CSS, JS</li>
+        </ul>
+
+        <div class="card-links">
+          <a class="card-link" href="cv-printer/printer-cv.html" title="Open the live demo">
+            <svg viewBox="0 0 16 16"><path d="M4.5 13.5l9-5.5-9-5.5v11z"/></svg>
+            Live Demo
+          </a>
+          <a class="card-link" href="https://github.com/gshantanu15/prompt-tests/blob/main/cv-printer/PROMPT.MD" title="Read the original prompt">
+            <svg viewBox="0 0 16 16"><path d="M4.5 0A2.5 2.5 0 002 2.5v11A2.5 2.5 0 004.5 16h7A2.5 2.5 0 0014 13.5v-9a.5.5 0 00-.146-.354l-4-4A.5.5 0 009.5 0H4.5zM10 1.707L12.293 4H10.5a.5.5 0 01-.5-.5V1.707zM4.5 1H9v2.5A1.5 1.5 0 0010.5 5H13v8.5a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 013 13.5v-11A1.5 1.5 0 014.5 1z"/></svg>
+            Prompt
+          </a>
+          <a class="card-link" href="https://github.com/gshantanu15/prompt-tests/blob/main/cv-printer/README.md" title="Read the project documentation">
+            <svg viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 01.75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0111.006 1h4.245a.75.75 0 01.75.75v10.5a.75.75 0 01-.75.75h-4.507a2.25 2.25 0 00-1.591.659l-.622.621a.75.75 0 01-1.06 0l-.622-.621A2.25 2.25 0 005.258 13H.75a.75.75 0 01-.75-.75V1.75zm7.25 10.7a3.74 3.74 0 00-2.247-.75H1.5V2.5h3.503a2.25 2.25 0 012.247 2.25v7.7zm1.5 0V4.75A2.25 2.25 0 0111.006 2.5H14.5v9.2h-3.494a3.74 3.74 0 00-2.247.75z"/></svg>
+            README
+          </a>
+          <a class="card-link" href="https://github.com/gshantanu15/prompt-tests/blob/main/cv-printer/chat-log/copilot-session-01-printer-cv.md" title="Read the development session log">
+            <svg viewBox="0 0 16 16"><path d="M2.5 1A1.5 1.5 0 001 2.5v11A1.5 1.5 0 002.5 15h11a1.5 1.5 0 001.5-1.5v-11A1.5 1.5 0 0013.5 1h-11zM3 3.5A.5.5 0 013.5 3h9a.5.5 0 010 1h-9a.5.5 0 01-.5-.5zM3.5 6a.5.5 0 000 1h9a.5.5 0 000-1h-9zM3 9.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5z"/></svg>
+            Chat Log
+          </a>
+        </div>
+      </div>
+    </article>
+
+    <!-- ── Placeholder for future projects ────────────── -->
+    <div class="glass placeholder-card fade-up">
+      <p class="placeholder-icon">+</p>
+      <p class="subtitle">More experiments? maybe idk</p>
+    </div>
+
+    <!-- How Each Project Is Built -->
+    <section class="how-section fade-up">
+      <p class="section-label">How Each Project Is Built</p>
+      <div class="how-grid">
+        <div class="how-card glass">
+          <div class="step-icon">&#x1f4dd;</div>
+          <h3>Specify</h3>
+          <p>Write a detailed natural-language prompt describing the desired outcome, constraints, and interaction model.</p>
+        </div>
+        <div class="how-card glass">
+          <div class="step-icon">&#x26a1;</div>
+          <h3>Generate</h3>
+          <p>Feed the prompt to an LLM and receive a working first draft — often hundreds of lines in one shot.</p>
+        </div>
+        <div class="how-card glass">
+          <div class="step-icon">&#x1f527;</div>
+          <h3>Refine</h3>
+          <p>Iterate with targeted follow-up prompts. Small, focused corrections often beat full rewrites.</p>
+        </div>
+        <div class="how-card glass">
+          <div class="step-icon">&#x1f4da;</div>
+          <h3>Document</h3>
+          <p>Capture the prompt, chat log, demo assets, and lessons learned for reproducibility.</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ─── Footer ──────────────────────────────────────── -->
+  <footer class="site-footer">
+    <p>Prompt Tests &mdash; prompt-driven development experiments</p>
+  </footer>
+
+  <!-- ─── Scripts ─────────────────────────────────────── -->
+  <script>
+    /* Theme toggle */
+    const toggle = document.querySelector('.theme-toggle');
+    const html = document.documentElement;
+
+    function setTheme(theme) {
+      html.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+    }
+
+    /* Respect saved preference or OS preference */
+    const saved = localStorage.getItem('theme');
+    if (saved) {
+      setTheme(saved);
+    } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+      setTheme('light');
+    }
+
+    toggle.addEventListener('click', function () {
+      var current = html.getAttribute('data-theme');
+      setTheme(current === 'dark' ? 'light' : 'dark');
+    });
+
+    /* Fade-up on scroll */
+    var fadeEls = document.querySelectorAll('.fade-up');
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    fadeEls.forEach(function (el) { observer.observe(el); });
+  </script>
+
+</body>
+</html>
